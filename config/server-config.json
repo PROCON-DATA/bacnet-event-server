@@ -1,0 +1,74 @@
+{
+  "server": {
+    "deviceInstance": 1234,
+    "deviceName": "BACnet-Event-Server",
+    "deviceDescription": "KurrentDB to BACnet/SC Gateway",
+    "vendorId": 999,
+    "vendorName": "Unlock Europe",
+    "modelName": "BACnet-Event-Server",
+    "covLifetime": 300,
+    "maxCovSubscriptions": 100
+  },
+  "bacnetsc": {
+    "enabled": true,
+    "hubUri": "wss://bacnet-hub.example.com:443",
+    "failoverHubUri": null,
+    "certificateFile": "/etc/bacnet-gateway/certs/device.pem",
+    "privateKeyFile": "/etc/bacnet-gateway/certs/device-key.pem",
+    "caCertificateFile": "/etc/bacnet-gateway/certs/ca.pem",
+    "hubFunctionEnabled": false,
+    "reconnectDelayMs": 5000
+  },
+  "bacnetip": {
+    "enabled": false,
+    "port": 47808,
+    "interface": "eth0"
+  },
+  "kurrentdb": {
+    "connectionString": "esdb://localhost:2113?tls=false",
+    "tlsEnabled": false,
+    "tlsVerifyCert": false,
+    "reconnectDelayMs": 5000,
+    "maxReconnectAttempts": -1
+  },
+  "redis": {
+    "host": "localhost",
+    "port": 6379,
+    "database": 0,
+    "keyPrefix": "bacnet:",
+    "connectionTimeout": 5000,
+    "commandTimeout": 1000
+  },
+  "devices": [
+    {
+      "subscriptionId": "energy-meters",
+      "streamName": "$ce-energy-meters",
+      "groupName": "bacnet-gateway",
+      "startFrom": "start",
+      "objectInstanceOffset": 0,
+      "enabled": true,
+      "metadata": {
+        "description": "All energy meters",
+        "building": "Headquarters"
+      }
+    },
+    {
+      "subscriptionId": "hvac-controllers",
+      "streamName": "$ce-hvac",
+      "groupName": "bacnet-gateway",
+      "startFrom": "start",
+      "objectInstanceOffset": 1000,
+      "enabled": true,
+      "metadata": {
+        "description": "HVAC Controllers",
+        "building": "Headquarters"
+      }
+    }
+  ],
+  "logging": {
+    "level": "info",
+    "file": "/var/log/bacnet-gateway/server.log",
+    "maxFileSizeMb": 100,
+    "maxBackupFiles": 5
+  }
+}

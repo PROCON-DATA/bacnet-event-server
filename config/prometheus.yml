@@ -1,0 +1,37 @@
+# Prometheus configuration for BACnet Event Server monitoring
+# See docs/TEST-PLAN.md and docs/QA-CONCEPT.md for details
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+rule_files:
+  - /etc/prometheus/alerts/*.yml
+
+scrape_configs:
+  # BACnet Event Server metrics
+  - job_name: 'bacnet-event-server'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['bacnet-server:9090']
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'bacnet_.*'
+        action: keep
+
+  # Redis metrics (if redis_exporter is available)
+  - job_name: 'redis'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['redis:9121']
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['localhost:9090']

@@ -1,0 +1,394 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://procon-data.at/schemas/bacnet-kurrentdb-message.json",
+  "title": "BACnet KurrentDB Message Schema",
+  "description": "Schema for messages sent to the BACnet server via KurrentDB subscriptions",
+  "type": "object",
+  "required": ["messageType", "timestamp", "sourceId"],
+  "properties": {
+    "messageType": {
+      "type": "string",
+      "enum": ["ObjectDefinition", "ValueUpdate", "ObjectDelete", "DeviceConfig"],
+      "description": "Type of message"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the message"
+    },
+    "sourceId": {
+      "type": "string",
+      "description": "Unique identifier of the data source (e.g. sensor ID, device ID)"
+    },
+    "streamPosition": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Position in KurrentDB stream for replay/recovery"
+    },
+    "correlationId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Optional correlation ID for tracking"
+    },
+    "payload": {
+      "oneOf": [
+        { "$ref": "#/definitions/ObjectDefinitionPayload" },
+        { "$ref": "#/definitions/ValueUpdatePayload" },
+        { "$ref": "#/definitions/ObjectDeletePayload" },
+        { "$ref": "#/definitions/DeviceConfigPayload" }
+      ]
+    }
+  },
+  "definitions": {
+    "ObjectDefinitionPayload": {
+      "type": "object",
+      "description": "Defines a new BACnet object or updates its metadata",
+      "required": ["objectType", "objectInstance", "objectName", "presentValueType"],
+      "properties": {
+        "objectType": {
+          "type": "string",
+          "enum": [
+            "analog-input",
+            "analog-output",
+            "analog-value",
+            "binary-input",
+            "binary-output",
+            "binary-value",
+            "multi-state-input",
+            "multi-state-output",
+            "multi-state-value"
+          ],
+          "description": "BACnet object type"
+        },
+        "objectInstance": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4194302,
+          "description": "BACnet object instance number"
+        },
+        "objectName": {
+          "type": "string",
+          "maxLength": 255,
+          "description": "BACnet object name"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 512,
+          "description": "Description of the object"
+        },
+        "presentValueType": {
+          "type": "string",
+          "enum": ["real", "unsigned", "signed", "enumerated", "boolean"],
+          "description": "Data type of the present value"
+        },
+        "units": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "BACnet engineering units (per ASHRAE standard)"
+        },
+        "unitsText": {
+          "type": "string",
+          "description": "Human-readable units text (e.g. 'kWh', '°C')"
+        },
+        "covIncrement": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Change-of-Value increment for analog values"
+        },
+        "minPresentValue": {
+          "type": "number",
+          "description": "Minimum allowed value"
+        },
+        "maxPresentValue": {
+          "type": "number",
+          "description": "Maximum allowed value"
+        },
+        "resolution": {
+          "type": "number",
+          "description": "Resolution of the value"
+        },
+        "stateTexts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "State texts for multi-state objects"
+        },
+        "inactiveText": {
+          "type": "string",
+          "description": "Text for binary inactive state"
+        },
+        "activeText": {
+          "type": "string",
+          "description": "Text for binary active state"
+        },
+        "initialValue": {
+          "oneOf": [
+            { "type": "number" },
+            { "type": "boolean" },
+            { "type": "integer" }
+          ],
+          "description": "Initial value when object is created"
+        },
+        "outOfService": {
+          "type": "boolean",
+          "default": false,
+          "description": "Out-of-service flag"
+        },
+        "reliability": {
+          "type": "string",
+          "enum": [
+            "no-fault-detected",
+            "no-sensor",
+            "over-range",
+            "under-range",
+            "open-loop",
+            "shorted-loop",
+            "unreliable-other",
+            "communication-failure"
+          ],
+          "default": "no-fault-detected",
+          "description": "Reliability status"
+        },
+        "eventState": {
+          "type": "string",
+          "enum": ["normal", "fault", "offnormal", "high-limit", "low-limit"],
+          "default": "normal",
+          "description": "Event state"
+        },
+        "priorityArray": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether priority array is supported (for outputs)"
+        },
+        "tags": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Custom tags for filtering/grouping"
+        }
+      }
+    },
+    "ValueUpdatePayload": {
+      "type": "object",
+      "description": "Updates the present value of an existing BACnet object",
+      "required": ["objectType", "objectInstance", "presentValue"],
+      "properties": {
+        "objectType": {
+          "type": "string",
+          "enum": [
+            "analog-input",
+            "analog-output",
+            "analog-value",
+            "binary-input",
+            "binary-output",
+            "binary-value",
+            "multi-state-input",
+            "multi-state-output",
+            "multi-state-value"
+          ],
+          "description": "BACnet object type"
+        },
+        "objectInstance": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4194302,
+          "description": "BACnet object instance number"
+        },
+        "presentValue": {
+          "oneOf": [
+            { "type": "number" },
+            { "type": "boolean" },
+            { "type": "integer" }
+          ],
+          "description": "New present value"
+        },
+        "quality": {
+          "type": "string",
+          "enum": ["good", "uncertain", "bad"],
+          "default": "good",
+          "description": "Quality information of the value"
+        },
+        "statusFlags": {
+          "type": "object",
+          "properties": {
+            "inAlarm": { "type": "boolean", "default": false },
+            "fault": { "type": "boolean", "default": false },
+            "overridden": { "type": "boolean", "default": false },
+            "outOfService": { "type": "boolean", "default": false }
+          },
+          "description": "BACnet status flags"
+        },
+        "reliability": {
+          "type": "string",
+          "enum": [
+            "no-fault-detected",
+            "no-sensor",
+            "over-range",
+            "under-range",
+            "open-loop",
+            "shorted-loop",
+            "unreliable-other",
+            "communication-failure"
+          ],
+          "description": "Reliability status update"
+        },
+        "eventState": {
+          "type": "string",
+          "enum": ["normal", "fault", "offnormal", "high-limit", "low-limit"],
+          "description": "Event state update"
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "description": "Priority for outputs (1-16)"
+        },
+        "sourceTimestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of measurement at source"
+        }
+      }
+    },
+    "ObjectDeletePayload": {
+      "type": "object",
+      "description": "Deletes a BACnet object",
+      "required": ["objectType", "objectInstance"],
+      "properties": {
+        "objectType": {
+          "type": "string",
+          "enum": [
+            "analog-input",
+            "analog-output",
+            "analog-value",
+            "binary-input",
+            "binary-output",
+            "binary-value",
+            "multi-state-input",
+            "multi-state-output",
+            "multi-state-value"
+          ],
+          "description": "BACnet object type"
+        },
+        "objectInstance": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4194302,
+          "description": "BACnet object instance number"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Optional reason for deletion"
+        }
+      }
+    },
+    "DeviceConfigPayload": {
+      "type": "object",
+      "description": "Configures device properties",
+      "properties": {
+        "deviceName": {
+          "type": "string",
+          "maxLength": 255,
+          "description": "BACnet device name"
+        },
+        "deviceDescription": {
+          "type": "string",
+          "maxLength": 512,
+          "description": "Device description"
+        },
+        "location": {
+          "type": "string",
+          "maxLength": 255,
+          "description": "Device location"
+        },
+        "modelName": {
+          "type": "string",
+          "maxLength": 255,
+          "description": "Model name"
+        },
+        "vendorName": {
+          "type": "string",
+          "maxLength": 255,
+          "description": "Vendor name"
+        },
+        "applicationSoftwareVersion": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Software version"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "messageType": "ObjectDefinition",
+      "timestamp": "2024-12-14T10:30:00Z",
+      "sourceId": "energy-meter-001",
+      "streamPosition": 12345,
+      "payload": {
+        "objectType": "analog-input",
+        "objectInstance": 1,
+        "objectName": "Total_Energy_kWh",
+        "description": "Total energy consumption in kWh",
+        "presentValueType": "real",
+        "units": 169,
+        "unitsText": "kWh",
+        "covIncrement": 0.1,
+        "minPresentValue": 0,
+        "maxPresentValue": 999999.99,
+        "initialValue": 0,
+        "tags": {
+          "building": "HQ",
+          "floor": "2",
+          "meterType": "main"
+        }
+      }
+    },
+    {
+      "messageType": "ValueUpdate",
+      "timestamp": "2024-12-14T10:30:15Z",
+      "sourceId": "energy-meter-001",
+      "streamPosition": 12346,
+      "payload": {
+        "objectType": "analog-input",
+        "objectInstance": 1,
+        "presentValue": 15234.56,
+        "quality": "good",
+        "statusFlags": {
+          "inAlarm": false,
+          "fault": false,
+          "overridden": false,
+          "outOfService": false
+        },
+        "sourceTimestamp": "2024-12-14T10:30:14.500Z"
+      }
+    },
+    {
+      "messageType": "ObjectDefinition",
+      "timestamp": "2024-12-14T10:30:00Z",
+      "sourceId": "hvac-controller-005",
+      "payload": {
+        "objectType": "binary-input",
+        "objectInstance": 100,
+        "objectName": "Compressor_Status",
+        "description": "Compressor status",
+        "presentValueType": "boolean",
+        "inactiveText": "OFF",
+        "activeText": "ON",
+        "initialValue": false
+      }
+    },
+    {
+      "messageType": "ObjectDefinition",
+      "timestamp": "2024-12-14T10:30:00Z",
+      "sourceId": "hvac-controller-005",
+      "payload": {
+        "objectType": "multi-state-value",
+        "objectInstance": 200,
+        "objectName": "Operating_Mode",
+        "description": "HVAC operating mode",
+        "presentValueType": "unsigned",
+        "stateTexts": ["Off", "Heating", "Cooling", "Auto", "Fan Only"],
+        "initialValue": 1
+      }
+    }
+  ]
+}

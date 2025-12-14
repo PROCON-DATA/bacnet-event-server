@@ -1,0 +1,127 @@
+# ============================================================================
+# Docker Compose for BACnet Event Server
+# 
+# Starts:
+# - Redis with persistence
+# - KurrentDB (EventStoreDB)
+# - BACnet Event Server
+# ============================================================================
+
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # Redis Cache with Persistence
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: bacnet-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bacnet-network
+
+  # ==========================================================================
+  # KurrentDB (EventStoreDB)
+  # ==========================================================================
+  kurrentdb:
+    image: eventstore/eventstore:23.10.0-bookworm-slim
+    container_name: bacnet-kurrentdb
+    restart: unless-stopped
+    environment:
+      - EVENTSTORE_CLUSTER_SIZE=1
+      - EVENTSTORE_RUN_PROJECTIONS=All
+      - EVENTSTORE_START_STANDARD_PROJECTIONS=true
+      - EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP=true
+      - EVENTSTORE_INSECURE=true  # Development only!
+      - EVENTSTORE_MEM_DB=false
+    ports:
+      - "2113:2113"  # HTTP/gRPC
+      - "1113:1113"  # TCP (legacy)
+    volumes:
+      - kurrentdb-data:/var/lib/eventstore
+      - kurrentdb-logs:/var/log/eventstore
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2113/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bacnet-network
+
+  # ==========================================================================
+  # BACnet Event Server
+  # ==========================================================================
+  bacnet-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bacnet-server
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      kurrentdb:
+        condition: service_healthy
+    ports:
+      - "47808:47808/udp"  # BACnet/IP
+    volumes:
+      - ./config/server-config.json:/etc/bacnet-gateway/server-config.json:ro
+      - bacnet-logs:/var/log/bacnet-gateway
+    environment:
+      - TZ=Europe/Vienna
+    networks:
+      - bacnet-network
+      # Host network for BACnet broadcasts (optional)
+      # network_mode: host
+
+  # ==========================================================================
+  # Redis Commander (Web UI for Redis) - Optional for development
+  # ==========================================================================
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: bacnet-redis-commander
+    restart: unless-stopped
+    profiles:
+      - dev
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - bacnet-network
+
+# ==========================================================================
+# Volumes
+# ==========================================================================
+volumes:
+  redis-data:
+    driver: local
+  kurrentdb-data:
+    driver: local
+  kurrentdb-logs:
+    driver: local
+  bacnet-logs:
+    driver: local
+
+# ==========================================================================
+# Networks
+# ==========================================================================
+networks:
+  bacnet-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

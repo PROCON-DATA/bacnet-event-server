@@ -1,0 +1,238 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://procon-data.at/schemas/bacnet-server-config.json",
+  "title": "BACnet Server Configuration",
+  "description": "Configuration for the BACnet Event Server",
+  "type": "object",
+  "required": ["server", "kurrentdb", "redis", "devices"],
+  "properties": {
+    "server": {
+      "type": "object",
+      "description": "BACnet server basic configuration",
+      "required": ["deviceInstance", "deviceName"],
+      "properties": {
+        "deviceInstance": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4194302,
+          "description": "BACnet device instance number"
+        },
+        "deviceName": {
+          "type": "string",
+          "maxLength": 255,
+          "description": "BACnet device name"
+        },
+        "deviceDescription": {
+          "type": "string",
+          "maxLength": 512,
+          "description": "Device description"
+        },
+        "vendorId": {
+          "type": "integer",
+          "default": 0,
+          "description": "BACnet vendor ID"
+        },
+        "vendorName": {
+          "type": "string",
+          "default": "Unlock Europe",
+          "description": "Vendor name"
+        },
+        "modelName": {
+          "type": "string",
+          "default": "KurrentDB-BACnet-Gateway",
+          "description": "Model name"
+        },
+        "port": {
+          "type": "integer",
+          "default": 47808,
+          "description": "BACnet/IP UDP port"
+        },
+        "interface": {
+          "type": "string",
+          "default": "eth0",
+          "description": "Network interface"
+        },
+        "broadcastAddress": {
+          "type": "string",
+          "format": "ipv4",
+          "description": "Broadcast address (optional)"
+        },
+        "covLifetime": {
+          "type": "integer",
+          "default": 300,
+          "minimum": 60,
+          "description": "Default COV subscription lifetime in seconds"
+        },
+        "maxCovSubscriptions": {
+          "type": "integer",
+          "default": 100,
+          "description": "Maximum number of concurrent COV subscriptions"
+        }
+      }
+    },
+    "kurrentdb": {
+      "type": "object",
+      "description": "KurrentDB connection configuration",
+      "required": ["connectionString"],
+      "properties": {
+        "connectionString": {
+          "type": "string",
+          "description": "KurrentDB connection string (esdb://...)"
+        },
+        "tlsEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable TLS encryption"
+        },
+        "tlsVerifyCert": {
+          "type": "boolean",
+          "default": true,
+          "description": "Verify TLS certificate"
+        },
+        "reconnectDelayMs": {
+          "type": "integer",
+          "default": 5000,
+          "description": "Reconnect delay in ms"
+        },
+        "maxReconnectAttempts": {
+          "type": "integer",
+          "default": -1,
+          "description": "Max reconnect attempts (-1 = infinite)"
+        }
+      }
+    },
+    "redis": {
+      "type": "object",
+      "description": "Redis cache configuration",
+      "required": ["host"],
+      "properties": {
+        "host": {
+          "type": "string",
+          "default": "localhost",
+          "description": "Redis host"
+        },
+        "port": {
+          "type": "integer",
+          "default": 6379,
+          "description": "Redis port"
+        },
+        "password": {
+          "type": "string",
+          "description": "Redis password (optional)"
+        },
+        "database": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 15,
+          "description": "Redis database index"
+        },
+        "keyPrefix": {
+          "type": "string",
+          "default": "bacnet:",
+          "description": "Prefix for all Redis keys"
+        },
+        "connectionTimeout": {
+          "type": "integer",
+          "default": 5000,
+          "description": "Connection timeout in ms"
+        },
+        "commandTimeout": {
+          "type": "integer",
+          "default": 1000,
+          "description": "Command timeout in ms"
+        }
+      }
+    },
+    "devices": {
+      "type": "array",
+      "description": "List of device subscriptions",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/DeviceSubscription"
+      }
+    },
+    "logging": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": ["trace", "debug", "info", "warn", "error"],
+          "default": "info",
+          "description": "Log level"
+        },
+        "file": {
+          "type": "string",
+          "description": "Log file path (optional)"
+        },
+        "maxFileSizeMb": {
+          "type": "integer",
+          "default": 100,
+          "description": "Maximum log file size in MB"
+        },
+        "maxBackupFiles": {
+          "type": "integer",
+          "default": 5,
+          "description": "Number of backup files"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "DeviceSubscription": {
+      "type": "object",
+      "description": "Configuration of a KurrentDB subscription for a virtual BACnet device",
+      "required": ["subscriptionId", "streamName"],
+      "properties": {
+        "subscriptionId": {
+          "type": "string",
+          "description": "Unique subscription ID"
+        },
+        "streamName": {
+          "type": "string",
+          "description": "KurrentDB stream name (e.g. 'device-energy-meter-001')"
+        },
+        "streamCategory": {
+          "type": "string",
+          "description": "KurrentDB stream category for $ce projection"
+        },
+        "groupName": {
+          "type": "string",
+          "description": "Persistent subscription group name"
+        },
+        "startFrom": {
+          "type": "string",
+          "enum": ["start", "end", "position"],
+          "default": "end",
+          "description": "Start position of subscription"
+        },
+        "startPosition": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Start position when startFrom='position'"
+        },
+        "objectInstanceOffset": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "description": "Offset for object instance numbers (for multiple subscriptions)"
+        },
+        "sourceIdFilter": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Filter for source IDs (empty = all)"
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Subscription enabled"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Custom metadata"
+        }
+      }
+    }
+  }
+}

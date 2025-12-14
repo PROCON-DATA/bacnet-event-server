@@ -1,0 +1,179 @@
+# ============================================================================
+# Docker Compose for BACnet Event Server - Durability Testing
+# 
+# Starts all components with resource limits for stress testing.
+# See docs/TEST-PLAN.md for full test specification.
+# 
+# Usage:
+#   docker-compose -f docker-compose.test.yml up -d
+#   docker-compose -f docker-compose.test.yml logs -f bacnet-server
+# ============================================================================
+
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # Redis Cache with Persistence (Resource Limited)
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: bacnet-test-redis
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 64M
+        reservations:
+          cpus: '0.1'
+          memory: 32M
+    command: redis-server --appendonly yes --maxmemory 50mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    networks:
+      - bacnet-test-network
+
+  # ==========================================================================
+  # KurrentDB (EventStoreDB)
+  # ==========================================================================
+  kurrentdb:
+    image: eventstore/eventstore:23.10.0-jammy
+    container_name: bacnet-test-kurrentdb
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    environment:
+      - EVENTSTORE_INSECURE=true
+      - EVENTSTORE_RUN_PROJECTIONS=All
+      - EVENTSTORE_ENABLE_ATOM_PUB_OVER_HTTP=true
+      - EVENTSTORE_MEM_DB=true
+    ports:
+      - "2113:2113"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2113/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - bacnet-test-network
+
+  # ==========================================================================
+  # BACnet Event Server (System Under Test)
+  # ==========================================================================
+  bacnet-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bacnet-test-server
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.25'
+          memory: 64M
+    depends_on:
+      redis:
+        condition: service_healthy
+      kurrentdb:
+        condition: service_healthy
+    environment:
+      - LOG_LEVEL=info
+      - LOG_FORMAT=json
+      - METRICS_PORT=9090
+    ports:
+      - "47808:47808/udp"
+      - "9090:9090"
+    volumes:
+      - ./config:/etc/bacnet-gateway:ro
+    networks:
+      - bacnet-test-network
+
+  # ==========================================================================
+  # Load Generator
+  # ==========================================================================
+  load-generator:
+    image: python:3.11-slim
+    container_name: bacnet-test-loadgen
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+    volumes:
+      - ./tests:/tests:ro
+    working_dir: /tests
+    command: >
+      bash -c "pip install --quiet esdbclient && 
+               python load_generator.py 100"
+    depends_on:
+      - kurrentdb
+    networks:
+      - bacnet-test-network
+
+  # ==========================================================================
+  # Prometheus (Metrics Collection)
+  # ==========================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: bacnet-test-prometheus
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+    ports:
+      - "9091:9090"
+    networks:
+      - bacnet-test-network
+
+  # ==========================================================================
+  # Grafana (Visualization)
+  # ==========================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: bacnet-test-grafana
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - bacnet-test-network
+
+networks:
+  bacnet-test-network:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:
